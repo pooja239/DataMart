@@ -119,18 +119,25 @@ contract DSC{
         return success;   
     }
     
-	// Once subscription is over, it can be deleted from the list. If all the subscriptions are over between a buyer and seller, 
-	// the DSC can be removed using self-destructt
-    function subscriptionDelete() public {
-		uint i;
+// Once subscription is over, it can be deleted from the list. 
+function subscriptionDelete(uint _subId) public {
+	delete subscriptionTable[_subId];
+}
+	
+//If all the subscriptions are over between a buyer and seller, 
+// the DSC can be removed using self-destruct otherwise contract can't be remove	
+function Delete(address _sender) public {	
+	uint i;
         for (i; i<subList.length;i++){
             if(subscriptionTable[i].stage != StatusChoices.End) {
                 break;
             }
         }
         if (i==subList.length){
-            selfdestruct(msg.sender);
+            selfdestruct(_sender);
         }
-        
-    }
+	else{
+		\\throw error that subscription are still active
+	}
+ }
 }
