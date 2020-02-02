@@ -112,8 +112,8 @@ contract DSC{
         }
         else if (_time >= subscriptionTable[_subId].start_time+subscriptionTable[_subId].duration){ //if the duration of the subscription is over
             subscriptionTable[_subId].stage = StatusChoices.End; //subcription has ended
-            rate.recordTrade(seller, buyer, subscriptionTable[_subId].total_price, _fsb, _time, 1);	//update the reputation score of selelr
-            rate.recordTrade(buyer, seller, subscriptionTable[_subId].total_price, _fbs, _time, 1)	//update the reputation score of buyer
+            rate.recordSummary(seller, buyer, subscriptionTable[_subId].total_price, _fsb, _time, 1);	//update the reputation score of selelr
+            rate.recordSummary(buyer, seller, subscriptionTable[_subId].total_price, _fbs, _time, 1)	//update the reputation score of buyer
 			//release the invoice to the buyer
         }
         return success;   
