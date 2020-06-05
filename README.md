@@ -1,7 +1,7 @@
 Smart Contract based Data Trading
 -------------------------------------------
 
-This is an implementation of data trading using multiple smart contracts to provide specific functionality in the marketplace as given below.
+This is an implementation of data trading using multiple smart contracts to provide specific functionality in the marketplace as given below. The main aim of this implementation is to demonstrate the autonomous framework of marketplace, different functionalities such as pricing model, reputation system, using smart contracts and automatic interactions among the contracts. 
 
 There are four smart contracts specifically designed to perform function as given below.
 
@@ -16,6 +16,7 @@ There are four smart contracts specifically designed to perform function as give
 
 Limitation: Fixed point numbers are not fully supported by Solidity. Therefore, the contracts are developed with Integer values.
             Similarly, exponential functions are also omitted in the implementation.
+            Few data driven use-cases such as division-by-zero are also omitted.
 
 
 This is version 1.0, DataMart is still under development. The current prototype is just to demonstrate the interactions of the four smart contracts to achieve the data trading in an autonomous and automatic manner.
