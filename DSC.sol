@@ -1,6 +1,6 @@
 // Implementation of the data subscription contract is given below. The code presents the high-level implmentation of the DSC to automatically
 // execute different stages in the data trading using smart contracts. There are five steps involved which are executed in sequential manner to
-// achieve the rading. The subscription stages are  Add, start, settlement, delete. Based on the off-chain notification, a transaction is issued to
+// achieve the trading. The subscription stages are  Add, start, settlement, delete. Based on the off-chain notification, a transaction is issued to
 // run different ABIs. The subscription moves to next stage when it has already completed the previous step. The contract maintains the
 // subscription information of all the subscriptions agreement made between a buyer and seller in a table "subscriptionTable". Each subscription is identified a unique identifier "_subId"
 
