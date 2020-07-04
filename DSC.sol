@@ -1,8 +1,13 @@
 // Implementation of the data subscription contract is given below. The code presents the high-level implmentation of the DSC to automatically
 // execute different stages in the data trading using smart contracts. There are five steps involved which are executed in sequential manner to
-// achieve the trading. The subscription stages are  Add, start, settlement, delete. Based on the off-chain notification, a transaction is issued to
+// achieve the trading. The subscription stages are  Add, start, settlement, End. Based on the off-chain notification, a transaction is issued to
 // run different ABIs. The subscription moves to next stage when it has already completed the previous step. The contract maintains the
-// subscription information of all the subscriptions agreement made between a buyer and seller in a table "subscriptionTable". Each subscription is identified a unique identifier "_subId"
+// subscription information of all the subscriptions agreement made between a buyer and seller in a table "subscriptionTable". Each subscription is 
+// identified using an unique identifier "_subId". Function subscriptionAdd is used to add subscription details in the subscriptionTable which is based on the 
+// subscriptionStruct. (key, value corresponds to the (_subId, subscription detail). SubscriptionAdd call pricing contract to fetch the price based on
+// the competitors price. SubscriptionStart is used to change the status of the subcription to active. subscriptionInfo returns the subscription detail. 
+// subscriptionSettlement performs the settlement after each N samples transfer. It calls the rating contract to fetch and record the feedback of the actors.
+
 
 
 pragma solidity >=0.4.22 <0.6.0;
@@ -14,7 +19,7 @@ import "./Account.sol";
 contract DSC{
     
     //manages the workflow of the agreement
-    enum StatusChoices {Add, Active, Settlement, End, Abort} //used to control the workflow of the agreement
+    enum StatusChoices {Add, Active, Settlement, End} //used to control the workflow of the agreement
     
     
     struct subscriptionStruct{                  
