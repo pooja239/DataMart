@@ -1,3 +1,8 @@
+//Implementation of the pricing contract is given below. The code presents the high-level implmentation of the contract. Price of the traded data 
+// on the marketplace are recorded in pricingHistory which is based on the price structure. function record_priceindex records the price index for 
+// each data type. getPrice fetches the average of the price based on the competitors price for a certain duration. In this we have assumed it to be
+// 24 hrs. CalPrice calculates the price based on the quality score, risk score and negotiation rate.
+
 pragma solidity >=0.4.22 <0.6.0;
 
 contract Pricing{
@@ -8,7 +13,7 @@ contract Pricing{
 
     string[] datatypes;
     
-	mapping (string=> price[]) public pricingHistory;
+	mapping (string=> price[]) pricingHistory;
     
 	/*record the data price*/
     function record_priceindex(string memory _datatype, uint _timestamp, uint _price, uint QS, uint RS) public {
@@ -44,9 +49,9 @@ contract Pricing{
 	///calcuate the price of the data using base price
 	function CalPrice(string memory data_type, uint QS, uint RS, uint NR, uint SI, uint dur, uint time) public returns (uint){
         //get the base price and calculate the price of the 
-		uint data_price = getPrice(data_type)*(100+QS+RS)/100*dur/SI;
-        data_price = data_price*(100+NR)/100;
-        record_priceindex(data_type, time, a*SI/dur, QS, RS); //record the data price index in the BC
+		uint unit_price = (getPrice(data_type)*(100+QS+RS))/100;
+        uint data_price = (unit_price*(100+NR)*dur)/(100*SI);
+        record_priceindex(data_type, time, unit_price, QS, RS); //record the data price index in the BC
         return data_price;
     }
 }
