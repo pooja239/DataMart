@@ -13,38 +13,46 @@ import "./Account.sol";
 
 contract DSC{
     
-    enum StatusChoices {Add, Running, Settlement, End, Abort} //used to control the execution flow of the agreement
+    //manages the workflow of the agreement
+    enum StatusChoices {Add, Active, Settlement, End, Abort} //used to control the workflow of the agreement
     
-    struct subscriptionStruct{
-        uint subId; //subscription id
-        bytes32 Deviceid; //device assigned for demand;
-        string datatype; //data type requested by buyer
-        uint start_time; //start time of the subscription
-        uint SI; //sampling interval of the data
-        uint duration; //duration of the subscription
-        uint payment_granularity; //payment granularity
-        StatusChoices stage; //stage of the subscription
-        uint total_price; //total price of the subcription
-        uint negotiation_rate; //negotiated terms
+    
+    struct subscriptionStruct{                  
+        address seller;                         //the seller of the corresponding seller-buyer pair of the DSC;
+        address buyer;                          //the buyer of the corresponding seller-buyer pair of the DSC;
+        bytes32 Deviceid;                       //device assigned for demand;
+        string datatype;                        //data type requested by buyer
+        uint start_time;                        //start time of the subscription
+        uint SI;                                //sampling interval of the data
+        uint duration;                          //duration of the subscription
+        uint payment_granularity;               //payment granularity
+        StatusChoices stage;                    //stage of the subscription
+        uint total_price;                       //total price of the subcription
+        uint negotiation_rate;                  //negotiated terms
+        bool exists;
     }
+    
+    uint[] subList;                             //maintains the list of subscription IDs
+    Rating  rate;
+    Pricing price;
+    Account account;
 
-	uint[] subList; //maintanis the list of all the subscriptions
-    Rating public rate; //handler for rating contract
-    Pricing public price; //handler for price contract
-    Account public account; //handler for account contract
+    mapping (uint=> subscriptionStruct) subscriptionTable;
 
-	//This is used for the initialization of all the other contracts addresses
-    function set_contract(address _account, address _rate, address _price) public {
+    event SubscriptionAdded(uint);
+    event SubscriptionStarted(uint);
+    event SubscriptionError(uint, string);
+    event SubscriptionSettlment(bool);
+    
+    constructor(address _account, address _rate, address _price) {
         account = Account(_account);
         rate = Rating(_rate);
         price = Pricing(_price);
-       
     }
-
-    mapping (uint=> subscriptionStruct) subscriptionTable;
-	
-	//This function is used to add the subscription information in the subscription list
-    function subscriptionAdd(uint _subId, string memory _deviceSN, string memory _datatype, uint _starttime, uint _SI, uint _dur, uint _QS, uint _RS, uint _PG, uint _NR, uint _timestamp) public{
+    
+    //add the subscription detail in the ledger
+    function subscriptionAdd(uint _subId, string memory _deviceSN, string memory _datatype, uint _starttime, uint _SI, uint _dur, uint _QS, uint _RS, uint _PG, uint _NR, uint _timestamp) private{
+        //uint _subId = subList.length; 
         subList.push(_subId);
         subscriptionTable[_subId].Deviceid = keccak256(abi.encodePacked(_deviceSN));
         subscriptionTable[_subId].datatype = _datatype;
@@ -52,27 +60,30 @@ contract DSC{
         subscriptionTable[_subId].SI = _SI;
         subscriptionTable[_subId].duration = _dur;
         subscriptionTable[_subId].payment_granularity = _PG;
-		
-		//price contract is used to calculate the price of the subscription based on the buyer's requirements
-        subscriptionTable[_subId].total_price = price.CalPrice(_datatype, _QS, _RS, _NR, _SI, _dur, _timestamp );
+        uint a = price.CalPrice(_datatype, _QS, _RS, _NR, _SI, _dur, _timestamp );
+        subscriptionTable[_subId].total_price = a;
         subscriptionTable[_subId].negotiation_rate = _NR;
+        subscriptionTable[_subId].exists = true;
         subscriptionTable[_subId].stage = StatusChoices.Add;
+        //held 2*total_price money from both the seller and buyer account in the Smart contract
+        emit SubscriptionAdded(_subId);
     }
     
-	//This function is used to start the subsctiption
-    function SubscriptionStart(uint _subId, uint _time) public {
-         require(uint(subscriptionTable[_subId].stage) == 0);
+    //this function sets the subscription state to active
+    function SubscriptionStart(uint _subId, uint _time) private {
+        require(uint(subscriptionTable[_subId].stage) == 0);
          if (_time == subscriptionTable[_subId].start_time) {
-            subscriptionTable[_subId].stage = StatusChoices.Running;
+            subscriptionTable[_subId].stage = StatusChoices.Active;
+            emit SubscriptionStarted(_subId);
          }
          else{
-             //Starting subscription at different time than start time.
+             emit SubscriptionError(_subId, "Not the start time");
          }
-    }
+     }
 
-	//To fetch the subsctiption info from the blockchain
-    function subscriptionInfo(uint _subId) public view returns (bytes32, string memory, uint, uint, uint, uint, uint) {
-        require(uint(subscriptionTable[_subId].stage) == 0);
+    //this function returns the subscription detail
+    function subscriptionInfo(uint _subId) private view returns (bytes32, string memory, uint, uint, uint, uint, uint) {
+        require(subscriptionTable[_subId].exists, "Subscription does not exist.");
         return (
             subscriptionTable[_subId].Deviceid,
             subscriptionTable[_subId].datatype,
@@ -81,63 +92,56 @@ contract DSC{
             subscriptionTable[_subId].duration,
             subscriptionTable[_subId].payment_granularity,
             subscriptionTable[_subId].total_price
-            uint(subscriptionTable[_subId].stage)
+            //subscriptionTable[_subId].stage
             );
+        //return uint(subscriptionTable[_subId].stage);
     }
     
-	//This ABI is required to be send by both buyer and seller. The payment needs to be release based on the payment granularity. If its the end of the subscription, both participants are required to submit their feedback. 
-    function subscriptionSettlement(uint sellerCount, uint buyerCount, address seller, address buyer, uint _subId, uint _time, uint _fsb, uint _fbs) public payable returns(bool){
-        require (msg.sender == seller && msg.sender == buyer);
+    //this function performs the settlement between the actors
+    function subscriptionSettlement(uint sellerCount, uint buyerCount, address seller, address buyer, uint _subId, uint _time, uint _fsb, uint _fbs) public payable {
+        //require (msg.sender == seller && msg.sender == buyer);
         bool success = false;
         subscriptionTable[_subId].stage = StatusChoices.Settlement; 
-        // Based on the payment granularity, the payment is calculated
-		uint pay = subscriptionTable[_subId].total_price*subscriptionTable[_subId].payment_granularity*subscriptionTable[_subId].SI/subscriptionTable[_subId].duration;
-		//If dispute occurs
-        if(sellerCount != buyerCount){
-            address disonestActor = rate.Dispute(seller,buyer); //identify the dishonest actor based on the repution score
-            uint fine = rate.penalty(disonestActor);			//penatly is calcualted
-            if (seller == disonestActor){
-                success = account.transfer(buyer,seller,pay-fine);
+        
+        //Calculate the payment based on the payment granularity
+        uint pay = subscriptionTable[_subId].total_price*subscriptionTable[_subId].payment_granularity*subscriptionTable[_subId].SI/subscriptionTable[_subId].duration;
+        
+        //Check if there is any conflict or not by comparing the counts sent by buyer and seller
+        if(sellerCount != buyerCount){                              //conflict situation
+            address disonestActor = rate.Dispute(seller,buyer);     //determine the dishonest actor based on the rating
+            uint fine = rate.penalty(disonestActor);                //evaluate the penalty
+            if (seller == disonestActor){                           //if seller is a dishonest actor, he will loose money
+                success = account.transfer(buyer,seller,pay-fine);  
             }
             else{
-                success = account.transfer(buyer,seller,pay+fine);
+                success = account.transfer(buyer,seller,pay+fine);  //if buyer is a dishonest actor
             }
         }
         else {
-            success = account.transfer(buyer,seller,pay);		//transfer funds from buyer to seller
+            success = account.transfer(buyer,seller,pay);           //if its a fair situation, make the payment
         }
-        //if the subscrition is not ended then the status of the subcription remains "Running"
-        if (_time < subscriptionTable[_subId].start_time+subscriptionTable[_subId].duration){
-               subscriptionTable[_subId].stage = StatusChoices.Running;
+        ///subscription stage changes
+        if (_time < subscriptionTable[_subId].start_time+subscriptionTable[_subId].duration){       //if the current time is less than the subscription duration
+               subscriptionTable[_subId].stage = StatusChoices.Active;                              // subscription needs to continue
         }
-        else if (_time >= subscriptionTable[_subId].start_time+subscriptionTable[_subId].duration){ //if the duration of the subscription is over
-            subscriptionTable[_subId].stage = StatusChoices.End; //subcription has ended
-            rate.recordSummary(seller, buyer, subscriptionTable[_subId].total_price, _fsb, _time, 1);	//update the reputation score of selelr
-            rate.recordSummary(buyer, seller, subscriptionTable[_subId].total_price, _fbs, _time, 1)	//update the reputation score of buyer
-			//release the invoice to the buyer
+        else if (_time >= subscriptionTable[_subId].start_time+subscriptionTable[_subId].duration){ //if current time is greater than the duration time
+            subscriptionTable[_subId].stage = StatusChoices.End;                                    // end the subscription
+            rate.recordTrade(seller, buyer, subscriptionTable[_subId].total_price, _fsb, _time, 1); // record the feedback of the actors
+            rate.recordTrade(buyer, seller, subscriptionTable[_subId].total_price, _fbs, _time, 1); // record the feedback of the actors
         }
-        return success;   
+        emit SubscriptionSettlment(success); // return true if the settlement is done, for unsuccessful settlement facilitator will get involved
+        
     }
     
-// Once subscription is over, it can be deleted from the list. 
-function subscriptionDelete(uint _subId) public {
-	delete subscriptionTable[_subId];
-}
-	
-//If all the subscriptions are over between a buyer and seller, 
-// the DSC can be removed using self-destruct otherwise contract can't be remove	
-function Delete(address _sender) public {	
-	uint i;
+    function Delete() private {
+        uint i;
         for (i; i<subList.length;i++){
             if(subscriptionTable[i].stage != StatusChoices.End) {
                 break;
             }
         }
         if (i==subList.length){
-            selfdestruct(_sender);
+            selfdestruct(msg.sender);
         }
-	else{
-		\\throw error that subscription are still active
-	}
- }
-}
+    }
+   
