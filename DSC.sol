@@ -60,8 +60,8 @@ contract DSC{
         subscriptionTable[_subId].SI = _SI;
         subscriptionTable[_subId].duration = _dur;
         subscriptionTable[_subId].payment_granularity = _PG;
-        uint a = price.CalPrice(_datatype, _QS, _RS, _NR, _SI, _dur, _timestamp );
-        subscriptionTable[_subId].total_price = a;
+        //call the pricing contract to get the price;
+        subscriptionTable[_subId].total_price = subscriptionTable[_subId].total_price = price.CalPrice(_datatype, _QS, _RS, _NR, _SI, _dur, _timestamp );
         subscriptionTable[_subId].negotiation_rate = _NR;
         subscriptionTable[_subId].exists = true;
         subscriptionTable[_subId].stage = StatusChoices.Add;
@@ -126,8 +126,8 @@ contract DSC{
         }
         else if (_time >= subscriptionTable[_subId].start_time+subscriptionTable[_subId].duration){ //if current time is greater than the duration time
             subscriptionTable[_subId].stage = StatusChoices.End;                                    // end the subscription
-            rate.recordTrade(seller, buyer, subscriptionTable[_subId].total_price, _fsb, _time, 1); // record the feedback of the actors
-            rate.recordTrade(buyer, seller, subscriptionTable[_subId].total_price, _fbs, _time, 1); // record the feedback of the actors
+            rate.recordTrade(seller, buyer, subscriptionTable[_subId].total_price, _fsb, _time, 1); // call the rating contract to record the feedback of the actors
+            rate.recordTrade(buyer, seller, subscriptionTable[_subId].total_price, _fbs, _time, 1); // call the rating contract to record the feedback of the actors
         }
         emit SubscriptionSettlment(success); // return true if the settlement is done, for unsuccessful settlement facilitator will get involved
         
